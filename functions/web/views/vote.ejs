@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <base href="<%= baseUrl %>" target="_self">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <title>馬名投票</title>
+
+  <script src="https://code.jquery.com/jquery-3.5.0.min.js"
+          integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="
+          crossorigin="anonymous"></script>
+  <style>
+    .pull-left   { float: left;  }
+    .pull-right  { float: right; }
+    .clear::after { content:' '; display: block; clear: both;  }
+
+    body {
+      width: calc(100% - 30px);
+      max-width: 420px;
+      margin: 30px auto 0;
+      font-size: 15px;
+      background-color: #e8f5e9;
+    }
+    form {
+      width: 100%;
+    }
+    .table-wrapper {
+      padding: 30px;
+      background-color: #fff;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th {
+      width: 75px;
+      border: 1px solid #000;
+      font-weight: normal;
+    }
+    td {
+      border: 1px solid #000;
+    }
+    label {
+      line-height: 30px;
+    }
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 6px 12px;
+      border: 0;
+      line-height: 30px;
+      font-size: 15px;
+      outline: none;
+    }
+    input[disabled] {
+      background-color: #eee;
+    }
+    textarea {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      height: 90px;
+      padding: 6px 12px;
+      border: 0;
+      line-height: 20px;
+      font-size: 15px;
+      resize: none;
+      outline: none;
+    }
+    textarea[disabled] {
+      background-color: #eee;
+    }
+    .rank {
+      font-weight: bold;
+    }
+    .user-name {
+      position: relative;
+    }
+    .user-name label {
+      position: absolute;
+      right: 0;
+      width: 60px;
+      line-height: 42px;
+      font-size: 18px;
+    }
+    .user-name input {
+      padding-right: 75px;
+      font-size: 18px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .submit-wrapper {
+      margin-top: 18px;
+      text-align: center;
+    }
+    button[type="submit"] {
+      height: 30px;
+      width: 120px;
+      border: 1px solid #bdbdbd;
+      line-height: 20px;
+      background: #eee;
+    }
+  </style>
+</head>
+<body>
+  <h4><%= room.name %></h4>
+  <header class="clear">
+    <h1 class="pull-left">ドラフト指名</h1>
+    <a class="pull-right" href="rooms/<%= room.id%>">戻る</a>
+  </header>
+
+  <form id="form" method="POST" action="rooms/<%= room.id%>/vote">
+    <div class="table-wrapper">
+      <table><tbody>
+      <tr>
+        <th class="rank">
+          <%= room.rank %> 位
+          <input type="hidden" name="rank" value="<%= room.rank %>">
+        </th>
+        <td>
+          <div class="user-name">
+            <input type="text" name="user_name" id="input-user" required="required">
+            <label for="input-user">厩舎</label>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <th>
+          <label for="input-father">父</label>
+        </th>
+        <td>
+          <input type="text" name="father" id="input-father" required="required">
+        </td>
+      </tr>
+      <tr>
+        <th>
+          <label for="input-mother">母</label>
+        </th>
+        <td>
+          <input type="text" name="mother" id="input-mother" required="required">
+        </td>
+      </tr>
+      <tr>
+        <th>
+          <label for="input-horse-name">馬名</label>
+        </th>
+        <td>
+          <input type="text" name="horse_name" id="input-horse-name" required="required">
+        </td>
+      </tr>
+      <tr>
+        <th>
+          <label for="input-gender">性別</label>
+        </th>
+        <td>
+          <input type="text" name="gender" id="input-gender" required="required">
+        </td>
+      </tr>
+      <tr>
+        <th>
+          <label for="input-stable">所属厩舎</label>
+        </th>
+        <td>
+          <input type="text" name="stable" id="input-stable" required="required">
+        </td>
+      </tr>
+      <tr>
+        <th>
+          <label for="input-comment">コメント</label>
+        </th>
+        <td>
+          <textarea name="comment" id="input-comment" required="required"></textarea>
+        </td>
+      </tr>
+      </tbody></table>
+    </div>
+    <div class="submit-wrapper">
+      <button type="submit" id="form-submit">指名する</button>
+    </div>
+  </form>
+
+  <script>
+    $(document).ready(() => {
+      const $form = $('#form');
+      const $userName = $form.find('input[name="user_name"]');
+      const userName = localStorage.getItem('user_name');
+      $userName.val(userName);
+
+      $('#form-submit').on('click', () => {
+        localStorage.setItem('user_name', $userName.val());
+        $('#form-submit').css('pointer-events','none');
+        $form.find('input, textarea').prop('readonly', 'readonly');
+      });
+    });
+  </script>
+</body>
+</html>

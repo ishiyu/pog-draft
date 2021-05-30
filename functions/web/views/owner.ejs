@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <base href="<%= baseUrl %>" target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    <title>司会者ページ</title>
+
+    <script src="https://code.jquery.com/jquery-3.5.0.min.js"
+            integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="
+            crossorigin="anonymous"></script>
+    <style>
+        .pull-left   { float: left;  }
+        .pull-right  { float: right; }
+        .clearfix::after { content:' '; display: block; clear: both;  }
+        .hidden {
+            display: none !important;
+        }
+
+        body {
+            width: calc(100% - 30px);
+            max-width: 840px;
+            margin: 30px auto 0;
+            font-size: 15px;
+            background-color: #d7ccc8;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            box-shadow: none;
+            box-sizing: border-box;
+            table-layout: fixed;
+        }
+        th {
+            box-sizing: border-box;
+            padding: 6px;
+            border-bottom: 1px solid #BDBDBD;
+            line-height: 24px;
+            font-weight: bold;
+            text-align: left;
+        }
+        td {
+            box-sizing: border-box;
+            padding: 6px;
+            line-height: 24px;
+        }
+        .rank {
+            width: 45px;
+        }
+        .user {
+            width: 90px;
+        }
+        .horse-name {
+            width: 240px;
+        }
+        .stable {
+            width: 90px;
+        }
+        .action {
+            width: 54px;
+        }
+    </style>
+</head>
+
+<body>
+<h4><%= room.name %></h4>
+<h1>司会者専用ページ</h1>
+<div class="clearfix">
+    <div class="pull-left">
+        現在の指名順位:
+        <input type="hidden" id="room-id"   value="<%= room.id %>">
+        <input type="number" id="room-rank" value="<%= room.rank %>">
+        <button id="change-rank">変更</button>
+    </div>
+    <div class="pull-right">
+        <a target="_blank"
+           href="rooms/<%= room.id %>/owner/starion_csv/">
+            POGスタリオン用CSVを出力
+        </a>
+    </div>
+    <div class="pull-right">
+        <a target="_blank"
+           href="rooms/<%= room.id %>/owner/starion/">
+            POGスタリオン用EXCELを出力
+        </a>
+    </div>
+</div>
+<table>
+    <thead>
+    <tr>
+        <th class="rank"      >指名<br/>順位</th>
+        <th class="user"      >指名者</th>
+        <th class="horse-name">馬名</th>
+        <th class="stable"    >厩舎名</th>
+        <th class="comment"   >コメント</th>
+        <th class="action"   >&nbsp;</th>
+    </tr>
+    </thead>
+    <tbody id="tbody">
+    <% voteList.forEach(function (hash, key) { %>
+    <tr>
+        <td class="rank"><%= hash.rank %>位</td>
+        <td class="user"><%= hash.user_name %><br/>厩舎</td>
+        <td class="horse-name">
+            <div style="clear:both;">
+                <div style="float:left;width:45px;text-align:right;">馬名：</div>
+                <div style="float:left;"><%= hash.horse_name %></div>
+            </div>
+            <div style="clear:both;">
+                <div style="float:left;width:45px;text-align:right;">父：</div>
+                <div style="float:left;"><%= hash.father %></div>
+            </div>
+            <div style="clear:both;">
+                <div style="float:left;width:45px;text-align:right;">母：</div>
+                <div style="float:left;"><%= hash.mother %></div>
+            </div>
+        </td>
+        <td class="stable" ><%= hash.stable %></td>
+        <td class="comment"><%= hash.comment %></td>
+        <td class="action">
+            <input type="hidden" name="vote-id"   value="<%= hash.id %>">
+            <input type="hidden" name="rank"      value="<%= hash.rank %>">
+            <input type="hidden" name="user-name" value="<%= hash.user_name %>">
+            <input type="hidden" name="mother"    value="<%= hash.mother %>">
+
+            <span class="decided <%= hash.status === 'decided' ? '' : 'hidden' %>">
+                [確定]
+            </span>
+            <span class="lose <%= hash.status === 'lose' ? '' : 'hidden' %>">
+                [負け]
+            </span>
+            <div class="buttons <%= hash.status === 'voted' ? '' : 'hidden' %>">
+                <button id="decide-button">確定</button>
+                <button id="lose-button">負け</button>
+                <button id="remove-button">削除</button>
+            </div>
+        </td>
+    </tr>
+    <% }); %>
+    </tbody>
+</table>
+
+<script>
+  const $document = $(document);
+  $document.ready(() => {
+    const roomId = $('#room-id').val();
+
+
+    $document.on('click', '#change-rank', function(e) {
+      const roomId = $('#room-id').val();
+      const rank   = $('#room-rank').val();
+      $.ajax({
+        type: 'POST',
+        url:  `rooms/${roomId}/owner/rank/`,
+        data:{
+          'rank': rank
+        }
+      }).fail( (data) => {
+        $('#room-rank').val(0);
+      });
+    });
+
+
+    $document.on('click', '#decide-button', function(event) {
+      const $action = $(this).parents('td.action');
+      const voteId = $action.find('input[name="vote-id"]').val();
+      const rank   = $action.find('input[name="rank"]').val();
+      const user   = $action.find('input[name="user-name"]').val();
+      const mother = $action.find('input[name="mother"]').val();
+
+      var result = window.confirm(`${user}厩舎の母${mother}を確定します。よろしいですか？`);
+      if (!result) return;
+
+      console.log(`id: ${voteId}`);
+      console.log(`rank: ${rank}`);
+      $.ajax({
+        type: 'POST',
+        url:  `rooms/${roomId}/owner/decide/`,
+        data:{
+          'voteId':    voteId,
+          'rank':      rank
+        }
+      }).done(() => {
+        $action.find('.decided').removeClass('hidden');
+        $action.find('.buttons').addClass('hidden');
+      }).fail(() => {
+        $action.find('.decided').addClass('hidden');
+        $action.find('.buttons').removeClass('hidden');
+      });
+    });
+
+
+    $document.on('click', '#lose-button', function(event) {
+      const $action = $(this).parents('td.action');
+      const voteId = $action.find('input[name="vote-id"]').val();
+      const rank   = $action.find('input[name="rank"]').val();
+      const user   = $action.find('input[name="user-name"]').val();
+      const mother = $action.find('input[name="mother"]').val();
+
+      const result = window.confirm(`${user}厩舎の母${mother}をサイコロ負けにします。よろしいですか？`);
+      if (!result) return;
+
+      console.log(`id: ${voteId}`);
+      console.log(`rank: ${rank}`);
+      $.ajax({
+        type: 'POST',
+        url:  `rooms/${roomId}/owner/lose/`,
+        data:{
+          'voteId':    voteId,
+          'rank':      rank
+        }
+      }).done(() => {
+        $action.find('.lose').removeClass('hidden');
+        $action.find('.buttons').addClass('hidden');
+      }).fail(() => {
+        $action.find('.lose').addClass('hidden');
+        $action.find('.buttons').removeClass('hidden');
+      });
+    });
+
+
+    $document.on('click', '#remove-button', function() {
+      const $action = $(this).parents('td.action');
+      const voteId = $action.find('input[name="vote-id"]').val();
+      const rank   = $action.find('input[name="rank"]').val();
+      const mother = $action.find('input[name="mother"]').val();
+
+      var result = window.confirm(`母${mother}を削除します。よろしいですか？`);
+      if (!result) return;
+
+      $.ajax({
+        type: 'POST',
+        url:  `rooms/${roomId}/owner/remove/`,
+        data:{
+          'voteId': voteId,
+          'rank':   rank
+        }
+      }).done(() => {
+        $action.parents('tr').addClass('hidden');
+      });
+    });
+  });
+</script>
+</body>
+</html>

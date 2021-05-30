@@ -1,0 +1,265 @@
+# Welcome to Serverless!
+#
+# This file is the main config file for your service.
+# It's very minimal at this point and uses default values.
+# You can always add more config options for more control.
+# We've included some commented out config examples here.
+# Just uncomment any of them to get that config option.
+#
+# For full config options, check the docs:
+#    docs.serverless.com
+#
+# Happy Coding!
+
+service: pog-draft
+
+
+plugins:
+  - serverless-iam-roles-per-function
+  - serverless-plugin-warmup
+  - serverless-prune-plugin
+  - serverless-domain-manager
+  #
+  # dev only
+  #
+  # serverless-offline needs to be last in the list
+  # refs: https://github.com/dherault/serverless-offline#usage-with-serverless-dynamodb-local-and-serverless-webpack-plugin
+  #
+  - serverless-dynamodb-local
+  - serverless-offline
+
+
+provider:
+  name: aws
+  runtime: nodejs10.x
+  stage: ${opt:stage, 'dev'}
+  region: ap-northeast-1
+  timeout: 10
+  logRetentionInDays: 3 # CloudWatch Logsの有効期限
+  environment:
+    STAGE: ${self:provider.stage}
+    SERVICE_NAME: ${self:service}
+  deploymentBucket:
+    name: ishiyu-serverless-deployment
+  # ルート選択式
+  websocketsApiRouteSelectionExpression: $request.body.action
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource:
+        - arn:aws:logs:*:*:*
+    - Effect: Allow
+      Action:
+        - execute-api:ManageConnections
+      Resource:
+        - arn:aws:execute-api:*:*:**/@connections/*
+    - Effect: Allow
+      Action:
+        - dynamodb:Scan
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - Fn::GetAtt: [ DynamoDbDraftConnectionTable, Arn ]
+
+
+custom:
+  name: 'wpa-draft'
+  prune:
+    automatic: true
+    number: 3
+  customDomain:
+    rest:
+      domainName: '${self:provider.stage}.wpa-draft.site'
+      stage: ${self:provider.stage}
+      certificateName: '*.wpa-draft.site'
+      createRoute53Record: true
+      endpointType: 'regional'
+      securityPolicy: tls_1_2
+    websocket:
+      domainName: 'ws-${self:provider.stage}.wpa-draft.site'
+      stage: ${self:provider.stage}
+      certificateName: '*.wpa-draft.site'
+      createRoute53Record: true
+      endpointType: 'regional'
+      securityPolicy: tls_1_2
+  dynamodb:
+    stages:
+      - dev
+    start:
+      port: 8000
+      inMemory: true
+      migrate: true
+      seed: true
+
+
+functions:
+  htmlIndex:
+    environment:
+      TABLE_CONNECTIONS: ${self:provider.stage}-draft-connections
+      TABLE_SEQUENCES: ${self:provider.stage}-draft-sequences
+      TABLE_ROOMS: ${self:provider.stage}-draft-rooms
+      TABLE_VOTES: ${self:provider.stage}-draft-votes
+    runtime: nodejs10.x
+    memorySize: 256
+    timeout: 10
+    handler: functions/web/app.handler
+    events:
+      - http:
+          method: ANY
+          path: '/'
+      - http:
+          method: ANY
+          path: '{proxy+}'
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:Scan
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+        Resource:
+          - "arn:aws:dynamodb:${self:provider.region}:*:table/*"
+      - Effect: Allow
+        Action:
+          - execute-api:ManageConnections
+        Resource:
+          - arn:aws:execute-api:*:*:**/@connections/*
+      - Effect: Allow
+        Action:
+          - dynamodb:Scan
+          - dynamodb:PutItem
+          - dynamodb:UpdateItem
+          - dynamodb:DeleteItem
+        Resource:
+          - Fn::GetAtt: [ DynamoDbDraftConnectionTable, Arn ]
+  webSocketConnect:
+    environment:
+      TABLE_CONNECTIONS: ${self:provider.stage}-draft-connections
+    handler: functions/websocket.connect
+    events:
+      - websocket:
+          route: $connect
+  webSocketDisconnect:
+    environment:
+      TABLE_CONNECTIONS: ${self:provider.stage}-draft-connections
+    handler: functions/websocket.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+  webSocketRingBell:
+    environment:
+      TABLE_CONNECTIONS: ${self:provider.stage}-draft-connections
+    handler: functions/websocket.ringBell
+    events:
+      - websocket:
+          route: ringBell
+
+
+# you can add CloudFormation resource templates here
+#resources:
+#  Resources:
+#    Bucket:
+#      Type: AWS::S3::Bucket
+#      Properties:
+#        BucketName: ${self:provider.environment.Bucket}
+resources:
+  Resources:
+    DynamoDbDraftSyquenceTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.stage}-draft-sequences
+        AttributeDefinitions:
+          - AttributeName: name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: name
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: True
+    DynamoDbDraftConnectionTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.stage}-draft-connections
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: True
+    DynamoDbDraftRoomTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.stage}-draft-rooms
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: True
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: N
+          - AttributeName: name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: index_name
+            KeySchema:
+              - AttributeName: name
+                KeyType: HASH
+            Projection:
+              ProjectionType: INCLUDE
+              NonKeyAttributes:
+                - id
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5
+
+    DynamoDbDraftVoteTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.stage}-draft-votes
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+        SSESpecification:
+          SSEEnabled: True
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: N
+          - AttributeName: room_id
+            AttributeType: N
+          - AttributeName: rank
+            AttributeType: N
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+          - AttributeName: room_id
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: index_rank
+            KeySchema:
+              - AttributeName: rank
+                KeyType: HASH
+            # https://docs.aws.amazon.com/ja_jp/AWSCloudFormation/latest/UserGuide/aws-properties-dynamodb-projectionobject.html
+            Projection:
+              ProjectionType: INCLUDE
+              NonKeyAttributes:
+                - id
+            ProvisionedThroughput:
+              ReadCapacityUnits: 5
+              WriteCapacityUnits: 5

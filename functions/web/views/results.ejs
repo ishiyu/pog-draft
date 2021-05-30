@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <base href="<%= baseUrl %>" target="_self">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    <title>ドラフト結果確認ページ</title>
+
+    <script src="https://code.jquery.com/jquery-3.5.0.min.js"
+            integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="
+            crossorigin="anonymous"></script>
+    <style>
+        .hidden {
+            display: none !important;
+        }
+
+        body {
+            position: relative;
+            width: 820px;
+            margin: 30px auto 0;
+            padding: 0 30px;
+            font-size: 15px;
+            background-color: #eee;
+        }
+        main {
+            padding: 30px;
+            background-color: #fff;
+        }
+        #select-user-name {
+            position: absolute;
+            top: 54px;
+            right: 12px;
+            font-size: 15px;
+        }
+        table#user-name {
+            margin-bottom: 30px;
+            border-collapse: collapse;
+            box-shadow: none;
+            box-sizing: border-box;
+            table-layout: fixed;
+        }
+        #user-name th {
+            width: 120px;
+            border-bottom: 1px solid #212121;
+            font-size: 18px;
+        }
+        #user-name td {
+            width: 240px;
+            border-bottom: 1px solid #212121;
+            font-size: 18px;
+        }
+        table#horse-list {
+            width: 100%;
+            border-collapse: collapse;
+            box-shadow: none;
+            box-sizing: border-box;
+            table-layout: fixed;
+        }
+        #horse-list th {
+            box-sizing: border-box;
+            padding: 6px;
+            border: 1px solid #212121;
+            line-height: 24px;
+            font-size: 15px;
+            font-weight: bold;
+            text-align: left;
+        }
+        #horse-list td {
+            box-sizing: border-box;
+            padding: 6px;
+            border: 1px solid #212121;
+            line-height: 24px;
+            font-size: 13px;
+        }
+        #horse-list .rank {
+            width: 54px;
+            text-align: center;
+        }
+        #horse-list .father,
+        #horse-list .mother {
+            width: 180px;
+        }
+        #horse-list .gender {
+            width: 45px;
+        }
+        #horse-list .stable {
+            width: 120px;
+        }
+    </style>
+    <style type="text/css" media="print">
+        body {
+            margin: 0 auto;
+            padding: 0;
+            background: #fff;
+        }
+        body > h1,
+        body > select {
+            display: none;
+        }
+        main {
+            padding: 0;
+        }
+        #horse-list td {
+            line-height: 36px;
+        }
+    </style>
+</head>
+<body>
+<h4><%= room.name %></h4>
+<h1>確定馬一覧</h1>
+
+<select id="select-user-name">
+    <option value="">全員</option>
+</select>
+
+
+<main>
+    <table id="user-name" class="hidden"><tbody>
+        <tr>
+            <th>厩舎名</th>
+            <td></td>
+        </tr>
+    </tbody></table>
+
+    <table id="horse-list">
+        <thead>
+        <tr>
+            <th class="rank"      >順位</th>
+            <th class="horse-name">馬名</th>
+            <th class="mother"    >父</th>
+            <th class="father"    >母</th>
+            <th class="gender"    >性別</th>
+            <th class="stable"    >厩舎名</th>
+        </tr>
+        </thead>
+        <tbody id="horse-list-tbody">
+        <% voteList.forEach(function (hash, key) { %>
+            <tr>
+                <td class="rank">
+                    <%= hash.rank %>位
+                    <input type="hidden" name="vote-id"   value="<%= hash.id %>">
+                    <input type="hidden" name="user-name" value="<%= hash.user_name %>">
+                    <input type="hidden" name="decided"   value="<%= hash.is_decided %>">
+                </td>
+                <td class="horse-name">
+                    <%= hash.horse_name %>
+                </td>
+                <td class="father">
+                    <%= hash.father %>
+                </td>
+                <td class="mother">
+                    <%= hash.mother %>
+                </td>
+                <td class="gender" ><%= hash.gender %></td>
+                <td class="stable hidden"><%= hash.stable %></td>
+                <td class="user"><%= hash.user_name %> 厩舎</td>
+            </tr>
+        <% }); %>
+        </tbody>
+    </table>
+</main>
+
+<script>
+  $(document).ready(() => {
+    const $select = $('#select-user-name');
+
+    // 厩舎の選択項目を生成
+    const $userNames = $('#horse-list-tbody input[name="user-name"]');
+    let userNames = $userNames.map((idx, e) => { return $(e).val(); }).toArray();
+    // unique にする
+    userNames = userNames.filter((elem, index, self) => self.indexOf(elem) === index);
+    userNames.forEach((userName) => {
+      $select.append(`<option value="${userName}">${userName} 厩舎</option>`);
+    });
+
+    // 厩舎選択時のイベント
+    $select.on('change', function(e) {
+      const value = $select.val();
+
+      if (!value) {
+        // 全員を選択
+        $('#user-name').addClass('hidden');
+      } else {
+        // ユーザを選択
+        $('#user-name').removeClass('hidden');
+        $('#user-name td').text(`${value} 厩舎`);
+      }
+
+      $('#horse-list-tbody tr').each(function(idx, tr) {
+        var $tr = $(tr);
+
+        if (!value) {
+          // 全員を選択
+          $('#user-name').addClass('hidden');
+          $tr.removeClass('hidden');
+          $tr.find('.stable').addClass('hidden');
+          $tr.find('.user').removeClass('hidden');
+        } else if (value === $tr.find('input[name="user-name"]').val()) {
+          // 選択したユーザの行
+          $tr.removeClass('hidden');
+          $tr.find('.stable').removeClass('hidden');
+          $tr.find('.user').addClass('hidden');
+        } else {
+          // 選んでないユーザの行
+          $tr.addClass('hidden');
+        }
+      });
+    });
+  });
+</script>
+</body>
+</html>
